@@ -1,0 +1,15 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+m <- matrix(rpois(50, 5), nrow = 5, ncol = 10)
+colnames(m) <- c("cond1", "cond2", "cond3", "cond4", "cond5", "ctrl1", "ctrl2", "ctrl3", "ctrl4", "ctrl5")
+rownames(m) <- c("gene1", "gene2", "gene3", "gene4", "geme5")
+
+
+```
+
