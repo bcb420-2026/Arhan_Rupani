@@ -1,0 +1,472 @@
+---
+title: "BCB420 Assignment 2: Data set Pathway and Network Analysis"
+author: "Arhan Rupani"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    theme: united
+    code_folding: show
+bibliography: references2.bib
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+# Brief introduction
+
+Acute Myloid Leukemia (AML) is a heterogeneous disease where different
+cell types contribute in disparate ways towards cancer initiation and
+progression. Therefore, to understand the biology of the disease, one
+needs to study it at the most microscopic level possible. In light of
+this and owing to my interest in cancer systems biology, I have chosen a
+case-control single cell RNAseq (scRNAseq) dataset of AML
+[@galen_single-cell_2019].
+
+The dataset contains bone marrow cells, from 5 healthy donors and 16 AML
+patients. Hence our control condition represents healthy hematopoeisis
+(healthy blood formation), and our test condition is that of malignant
+hematopoeisis (i.e. blood formation in AML). Given the scope of this
+assignment, I have decided to include the following in my dataset: all
+healthy cells and only a single AML patient's cells.
+
+More detail on background, data inspection, and differential gene
+expression analysis can be found in report 1 below.
+
+# Assignment 1
+
+```{r report1, child = 'A1_arhanRupani.Rmd'}
+```
+
+# Assignment 2
+
+```{r, results='hide'}
+setwd("~/projects")
+housekeeping <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    install.packages(pkg)
+  }
+  library(pkg, character.only = TRUE)
+}
+
+pkgs <- list("ggplot2", "readr", "gprofiler2", "GSA", "dplyr", "RCurl", "knitr")
+lapply(pkgs, housekeeping)
+```
+
+## Thresholded over-representation analysis
+
+### Creating a thresholded list from the DGE analysis
+
+```{r}
+# reading the gene list
+degList <- as.data.frame(read_csv("degList.csv"))
+row.names(degList) <- degList[["gene"]]
+
+# thresholding the gene list based on adjusted pvalue
+thresholdList <- degList[degList[["p_val_adj"]] < 0.05, ]
+
+# up and down regulated gene sets
+upReg <- thresholdList[thresholdList[["avg_log2FC"]] > 0, ]
+downReg <- thresholdList[thresholdList[["avg_log2FC"]] < 0, ]
+
+# show top 10 of each
+```
+
+### running g:profiler [@kolberg_gprofilerinteroperable_2023]
+
+```{r}
+querySet <- thresholdList$gene
+organism <- "hsapiens"
+gprofilerResults <- gost(
+  query = querySet,
+  significant = FALSE,
+  ordered_query = FALSE,
+  exclude_iea = TRUE,
+  correction_method = "fdr",
+  organism = organism,
+  source = c("REAC", "WP", "GO:BP")
+)
+# get the gprofiler results table
+gostplot(gprofilerResults, capped = TRUE, interactive = TRUE)
+```
+
+```{r, results='asis'}
+enrichment_results <- gprofilerResults$result
+cols <- c("source", "term_name", "p_value")
+kable(enrichment_results[1:10, cols], caption = "Top 10 over represented genesets considering both up and down regulated genes")
+```
+
+### Question and answers
+
+1.  Which method did you choose and why?<br> For creating a thresholded
+    list, I used the cuttoff: adjusted p=value \< 0.05. Then used the
+    genes in the thresholded list as the query list input to gprofiler.
+    I use Benjamini-Hochberg FDR as the significance threshold to
+    identify over represented gene sets.
+
+2.  What annotation data did you use and why? What version of the
+    annotation are you using?<br>
+
+-   For the source of annotaion gene-sets, I am using the follwong
+    databases: GO biological process (<GO:BP>), WikiPathways (WP), and
+    Reactome (Reac).
+
+```{r}
+versionInfo <- get_version_info(organism = "hsapiens")$sources
+cat("Version for GO biological process (GO:BP): ", versionInfo$`GO:BP`$version, "\n")
+cat("Version for WikiPathways (WP): ", versionInfo$WP$version, "\n")
+cat("Version for Reactome (Reac): ", versionInfo$REAC$version, "\n")
+```
+
+3.  How many genesets were returned with what thresholds?<br> The
+    threshold chosen for a geneset to be significantly enriched is
+    p-value \> 0.05. Below are the value counts of significantly vs
+    insignificantly enriched genesets.
+
+```{r, results='asis'}
+kable(enrichment_results |> count(significant), caption = "Value counts for significant vs insignificant genesets as a result of gprofiler analysis")
+```
+
+4.  Run the analysis using the up-regulated set of genes, and the
+    down-regulated set of genes separately. How do these results compare
+    to using the whole list (i.e all differentially expressed genes
+    together vs. the up-regulated and down regulated differentially
+    expressed genes separately)?<br> The following is the comparison of
+    over representation analysis when performed with only up or
+    downregulated list of genes:
+
+```{r}
+querySetUp <- upReg$gene
+querySetDown <- downReg$gene
+
+
+gprofilerResultsForUp <- gost(
+  query = querySetUp,
+  significant = FALSE,
+  ordered_query = FALSE,
+  exclude_iea = TRUE,
+  correction_method = "fdr",
+  organism = organism,
+  source = c("REAC", "WP", "GO:BP")
+)
+
+gprofilerResultsForDown <- gost(
+  query = querySetDown,
+  significant = FALSE,
+  ordered_query = FALSE,
+  exclude_iea = TRUE,
+  correction_method = "fdr",
+  organism = organism,
+  source = c("REAC", "WP", "GO:BP")
+)
+
+enrichmentResultsForUp <- gprofilerResultsForUp$result
+enrichmentResultsForDown <- gprofilerResultsForDown$result
+
+
+cat("Number of genesets significantly enriched when using up + down regulated DEGs:", count(enrichment_results, significant) |> filter(significant == TRUE) |> pull(n), "\n")
+cat("Number of genesets significantly enriched when using only up regulated DEGs:", count(enrichmentResultsForUp, significant) |> filter(significant == TRUE) |> pull(n), "\n")
+cat("Number of genesets significantly enriched when using only down regulated DEGs:", count(enrichmentResultsForDown, significant) |> filter(significant == TRUE) |> pull(n), "\n")
+```
+
+The following dataframe represents name of top 10 over-represented
+gene-sets for all the 3 cases:
+
+```{r, results='asis'}
+kable(as.data.frame(list(
+  "up plus down" = enrichment_results$term_name[1:10],
+  "up" = enrichmentResultsForUp$term_name[1:10],
+  "down" = enrichmentResultsForDown$term_name[1:10]
+)), caption = "Naive comparisson of the results with 3 different genesets permutations")
+```
+
+NOTE: This is not a robust analysis, one could use set distance measures
+like jaccard similarity or plot a simple pie chart to see overlapping
+genesets when comparing the 3 variants of over representation analysis.
+Performing thereof analysis is out of the scope for this assignment.
+
+### Interpretation
+
+Van Galen et al., the authors of the paper accompanying the data, did
+not particularly analyzed the transcriptional profiles of all individual
+cell types. In this report I analyze transcriptional differences in
+healthy vs malignant promonocyte cells.
+
+1.  Do the over-representation results support conclusions or mechanism
+    discussed in the original paper?
+
+One of the major themes that come out of my analysis is enrichment of
+genesets related to ribosomal biogenesis and translation. Upon reviewing
+existing literature, I found out that dysregulated ribosomal biogenesis
+is a widely recognized driver of tumorigenesis [@gitareja_ribosome_2025].
+
+2.  Can you find evidence, i.e. publications, to support some of the
+    results that you see. How does this evidence support your results.
+
+This research by Chen et al elucidates the role of dysregulated
+ribosomal biogenesis specifically in AML [@chen_elucidating_2025]. Genesets related to translation
+are upregulated as the rapid and continuous proliferation of cancer
+cells requires continuous protein synthesis and increased ribosome
+content.
+
+## Non-thresholded Gene set Enrichment Analysis [@subramanian_gene_2005]
+
+```{r, parameter_setup}
+# Setting up parameters
+gseaJar <- "/home/rstudio/GSEA_4.4.0/gsea-cli.sh"
+workingDir <- getwd()
+
+if (!dir.exists("./gsea_results")) {
+  dir.create("./gsea_results")
+}
+outputDir <- paste(getwd(), "gsea_results", sep = "/")
+
+# we set up destGmtFile to be "" so it fetches the latest one from the bader lab website
+destGmtFile <- ""
+runGSEA <- TRUE
+analysisName <- "promono_healthy_vs_leukemia_expression"
+rankFile <- "promono_healthy_vs_leukemia_expression.rnk"
+```
+
+### Creating a non thresholded list from the DGE analysis
+
+The code below was used to generate the ranks file which is required as
+an input to GSEA.
+
+```{r}
+rankedList <- degList
+rankedList[, "rank"] <- log10(rankedList$p_val) * sign(rankedList$avg_log2FC)
+rankedList <- arrange(rankedList, desc(rank))
+if (!file.exists(rankFile)) {
+  write.table(rankedList[c("gene", "rank")], file = rankFile, quote = FALSE, sep = "\t", row.names = FALSE)
+}
+```
+
+### Running GSEA
+
+The code below pulls the GMT file from the bader lab index but was not
+used for GSEA due to perpetual errors which I couldn't fix.
+
+```{r}
+# The code in the bioinformatics.ca tutorial doesnot work for me for some reason so I have manually fetched the filename
+
+# if(destGmtFile == ""){
+#   gmtUrl = "http://download.baderlab.org/EM_Genesets/current_release/Human/symbol/"
+#
+#   #list all the files on the server
+#   filenames = getURL(gmtUrl)
+#   tc = textConnection(filenames)
+#   contents = readLines(tc)
+#   close(tc)
+#
+#   #get the gmt that has all the pathways and does not include terms
+#   # inferred from electronic annotations(IEA)
+#   #start with gmt file that has pathways only and GO Biological Process only.
+#   rx = gregexpr("(?<=<a href=\")(.*.GOBP_AllPathways_noPFOCR_no_GO_iea.*.)(.gmt)(?=\">)",
+#     contents, perl = TRUE)
+#   gmt_file = unlist(regmatches(contents, rx))
+#
+#   destGmtFile <- file.path(outputDir, gmt_file)
+#
+#   #check if this gmt file already exists
+#   if(!file.exists(destGmtFile)){
+#     download.file(
+#       paste(gmtUrl,gmt_file,sep=""),
+#       destfile=destGmtFile
+#     )
+#   }
+# }
+
+if (destGmtFile == "") {
+  gmtUrl <- "http://download.baderlab.org/EM_Genesets/current_release/Human/symbol/"
+  gmtFile <- "Human_GO_AllPathways_noPFOCR_no_GO_iea_March_02_2026_symbol.gmt"
+  destGmtFile <- file.path(outputDir, gmtFile)
+  if (!file.exists(destGmtFile)) {
+    download.file(
+      paste(gmtUrl, gmtFile, sep = ""),
+      destfile = destGmtFile
+    )
+  }
+}
+```
+
+Initially, I tried running GSEA using R but couldn't do it; below is my
+code. Therefore, GSEA analysis was performed using the application GUI.
+
+```{r, eval = FALSE}
+if (runGSEA) {
+  command <- paste("", gseaJar,
+    "GSEAPreRanked -gmx", destGmtFile,
+    "-rnk", file.path(workingDir, rankFile),
+    "-collapse false -nperm 1000 -scoring_scheme weighted",
+    "-rpt_label ", analysisName,
+    "  -plot_top_x 20 -rnd_seed 12345  -set_max 200",
+    " -set_min 15 -zip_report false ",
+    " -out", outputDir,
+    " > ./gsea_results/gsea_output.txt",
+    sep = " "
+  )
+  system(command)
+}
+```
+
+### Question and answers
+
+1.  What method did you use? What genesets did you use? Make sure to
+    specify versions and cite your methods.
+
+I performed GSEA using the GUI of the application
+[@subramanian_gene_2005]. I used the C5 geneset provided in the MsigDB.
+It comprises of gene sets that contain genes annotated by the same
+ontology term. C5 collection is divided into two subcollections, the
+first derived from the Gene Ontology resource (GO) which contains BP,
+CC, and MF components and a second derived from the Human Phenotype
+Ontology (HPO). I used both the subcollections. I used the 2026 version
+specified by the follwing gmt file: `c5.all.v2026.1.Hs.symbols.gmt`.
+
+2.  Summarize your enrichment results.
+
+GSEA report contains two “Enrichment in Phenotype” sections. The first
+section shows results for gene sets that have a positive enrichment
+score (gene sets that show enrichment at the top of the ranked list) and
+the second section shows results for gene sets that have a negative
+enrichment score (gene sets that show enrichment at the bottom of the
+ranked list). Below are the names corresponding to top 10 enriched
+genesets for both the cases.
+
+```{r}
+upRegGeneSets <- read.delim("gsea_report_for_na_pos_1773179948718.tsv", sep = "\t")
+downRegGeneSets <- read.delim("gsea_report_for_na_neg_1773179948718.tsv", sep = "\t")
+cols <- c("NAME", "FDR.q.val", "SIZE")
+
+kable(upRegGeneSets[1:10, cols], caption = "Top 10 genesets with positive enrichment scores")
+```
+
+```{r}
+kable(downRegGeneSets[1:10, cols], caption = "Top 10 genesets with negative enrichment scores")
+```
+
+TODO: talk about leading edge potentially
+
+3.  How do these results compare to the results from the thresholded
+    analysis in Assignment #2. Compare qualitatively. Is this a straight
+    forward comparison? Why or why not?
+
+Comparisson between the results of thresholded vs non-thresholded
+analysis is not a straightforward comparisons because of many resaons.
+First of all, I have not used the same source of genesets for
+annotations so this is clearly not an apples to apples comparisson. But
+say even if we do use the same genesets for annotation purposes, the two
+methods use different statistical models which have their own disparate
+assumptions. One can use cytoscape to cluster genesets and see what
+common themes emerge with both the enrichment methods. However, I will
+not do that comparisson here in the interest of keeping the report
+concise.
+
+For the sake of this question, the table below shows top 10 processes
+from both the analysis side by side.
+
+```{r}
+gseaTop10 <- 
+df <- data.frame("ORA (up + down)" = enrichment_results$term_name[1:10], 
+                 "ORA up" = enrichmentResultsForUp$term_name[1:10],
+                 "ORA down" = enrichmentResultsForDown$term_name[1:10],
+                 "GSEA positive" = upRegGeneSets$NAME[1:10],
+                 "GSEA negative" = downRegGeneSets$NAME[1:10]
+                 )
+kable(df, caption = "Comparisson of top10 genesets for over representaion analysis (ORA) vs gene set enrichment analysis (GSEA)")
+```
+
+## Visualizing Gene set Enrichment Analysis in Cytoscape
+
+We will use the results from non-thresholded gene set enrichment
+analysis to visualize them in Cytoscape [@shannon_cytoscape_2003].
+
+### Question and answers
+
+1.  Create an enrichment map - how many nodes and how many edges in the
+    resulting map? What thresholds were used to create this map? Make
+    sure to record all thresholds. Include a screenshot of your network
+    prior to manual layout.
+
+To create the enrichment map, first I thoroughly read the following
+enrichment map documentation
+<https://enrichmentmap.readthedocs.io/en/latest/index.html>. As
+described in the "Tips on parameter choice section", I decided to use
+very permissive thresholds of p-value \< 0.05, FDR \< 0.25, and a
+moderately conservative overlap threshold of 0.5
+[@merico_enrichment_2010.
+
+![Fig: network prior to the manual layout](figures/cytoscape1.png)
+![Fig: threshold parameters for the enrichment
+map](figures/em_param.png)
+
+2.  Annotate your network - what parameters did you use to annotate the
+    network. If you are using the default parameters make sure to list
+    them as well.
+
+I used autoannotate [@kucera_autoannotate_2016]to cluster and annotate
+the network. I used the parameters depicted in the figure which follows,
+![Fig: threshold parameters for finding clusters in the network and
+annotating them](figures/autoannotate_params.png)
+
+3.  Make a publication ready figure - include this figure with proper
+    legends in your notebook.
+
+A publication ready figure is as follows: ![Fig: The figure depicts
+genesets which are clustered based ont the overlap of genes in the
+genesets. The annotations represent common theme for each
+cluster.](figures/Enrichment_Map.png)
+
+4.  Collapse your network to a theme network. What are the major themes
+    present in this analysis? Do they fit with the model? Are there any
+    novel pathways or themes?
+
+The following is the collapsed netwrk. ![Fig: Network where clusters
+have been collapsed into nodes, and the size of the node represents the
+size of the cluster i.e bigger node =\> more genesets in the
+cluster.](figures/collapsed_network.png) NOTE: I was unable to show
+labels of each meta-cluster. Now there are two major themes—which fit
+with the current model—I would like to talk about here. First, genesets
+related to growth factor receptor and signal transductions are enriched.
+This is not surprising as ... Second, genesets related to translation
+control and ribosomal biogenesis are enriched and form the most dense
+cluster. This is novel with respect to the author's analysis. Below, I
+will discuss the significance of both of these results in the context of
+this analysis.
+
+## Interpretation and detailed view of results
+
+Here I will relate my results back to the initial data and question.
+
+1.  Do the enrichment results support conclusions or mechanism discussed
+    in the original paper? How do these results differ from the results
+    you got from Assignment #2 thresholded methods
+
+Clearly, enrichment of genesets related to ribosome function and
+cytoplasmic translation appears to be a major theme from both
+thresholded and non-thresholded analysis. This is in line with overall
+context of this data. Since we are comparing malignant cells to healthy
+cells, its indeed not surprising that genesets related to translation
+are upregulated as the rapid and continuous proliferation of cancer
+cells requires continuous protein synthesis and increased ribosome
+content [@robichaud_translational_2019].
+
+2.  Can you find evidence, i.e. publications, to support some of the
+    results that you see. How does this evidence support your result?
+
+We see upregulation of translation related genes like elongation
+factors. This finding is supported by Robivhaud et al. in a review about
+translational control in cancer, whereby they
+describe—mechanistically—the implications of this finding in the context
+of cancer [@robichaud_translational_2019].
+
+# NOTE
+
+No Generative AI was used in any form or capacity during the entirity of
+this assignment.
+
+# References

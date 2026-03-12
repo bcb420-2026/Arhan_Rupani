@@ -18,10 +18,10 @@ editor_options:
 ---
 
 ```{r, label=setup, include=FALSE}
-# This is to get around the issue of markdown compilation if my .bib file does not exist in the same wd.
-# This is likely to happen if my full directory is not pulled and only the file is ran.
+## This is to get around the issue of markdown compilation if my .bib file does not exist in the same wd.
+## This is likely to happen if my full directory is not pulled and only the file is run.
 
-# Create empty bib file if it doesn't exist
+## Create empty bib file if it doesn't exist
 if (!file.exists("references.bib")) {
   file.create("references.bib")
   print("NOTE: Since the whole repo is not copied, the notebook might show different behaviour because of the absence of the .bib file")
@@ -29,7 +29,7 @@ if (!file.exists("references.bib")) {
   print("references.bib file already exists")
 }
 
-# Install and load the required packages 
+## Install and load the required packages 
 
 if (!requireNamespace("Seurat", quietly = TRUE)) {
   install.packages("Seurat")
@@ -51,7 +51,7 @@ if (!requireNamespace("BiocManager", quietly = TRUE)) {
 }
 if (!requireNamespace("glmGamPoi", quitely = TRUE)) {
   BiocManager::install("glmGamPoi")
-}   
+}
 
 library(Seurat)
 library(tidyverse)
@@ -62,7 +62,7 @@ library(gridExtra)
 library(biomaRt)
 ```
 
-# Introduction {#dataset-interest-question}
+## Introduction {#dataset-interest-question}
 
 Acute Myloid Leukemia (AML) is a heterogeneous disease where different
 cell types contribute in disparate ways towards cancer initiation and
@@ -74,7 +74,7 @@ case-control single cell RNAseq (scRNAseq) dataset of AML
 
 A note on the structure of this r markdown report: firstly, chunks of code which do not substantially reflect any specific learning are left out of the render however rmarkdown should be checked to understand the full extent of the work put into the assignment; then there are code chunks for which outputs are ommited but the code is shown to highlight the code itself. Finally, there are code chunks for which outputs are displayed and are meant to be read as a part of the report.
 
-## Dataset description {#control-test-question}
+### Dataset description {#control-test-question}
 
 The dataset contains bone marrow cells, from 5 healthy donors and 16 AML
 patients. Hence our control condition represents healthy hematopoeisis
@@ -83,28 +83,28 @@ hematopoeisis (i.e. blood formation in AML). Given the scope of this
 assignment, I have decided to include the following in my dataset: all
 healthy cells and only a single AML patient's cells.
 
-### Dataset downloading
+#### Dataset downloading
 
 First we start with installing our dataset. Here I have written part of
 my routine in bash as GEOquery wasn't working well for single cell data.
 
 ```{bash, label=dataset1}
-# Set initial directory
+## Set initial directory
 
 cd /home/rstudio/projects
 ```
 
 ```{r, label=dataset2}
-# Do the string processing for links in R and save it in a text file
+## Do the string processing for links in R and save it in a text file
 
-# healthy string processing
+## healthy string processing
 if (!"healthy_data_links.txt" %in% list.files("/home/rstudio/projects")) {
   healthy_samp_num_vector <- paste0("GSM358", 7996:8003)
   ftp_links <- paste0("ftp://ftp.ncbi.nlm.nih.gov/geo/samples/", substring(healthy_samp_num_vector, 1, 7), "nnn/", healthy_samp_num_vector, "/suppl/")
   writeLines(ftp_links, "healthy_data_links.txt")
 }
 
-# cancer string processing
+## cancer string processing
 if (!"cancer_data_links.txt" %in% list.files("/home/rstudio/projects")) {
   cancer_sample_num_vector <- paste0("GSM358", 7963:7968)
 ftp_links <- paste0("ftp://ftp.ncbi.nlm.nih.gov/geo/samples/", substring(cancer_sample_num_vector, 1, 7), "nnn/", cancer_sample_num_vector, "/suppl/")
@@ -113,9 +113,9 @@ writeLines(ftp_links, "cancer_data_links.txt")
 ```
 
 ```{bash, label=dataset3}
-# Set up the data directories, download the files, and unzip them
+## Set up the data directories, download the files, and unzip them
 
-# TODO: put this in an ifelse block
+## TODO: put this in an ifelse block
 if [ ! -d "data/healthy" ] || [ ! -d "data/cancer" ]; then
     echo Setting up the data directories...
     mkdir data && mkdir data/healthy data/cancer
@@ -146,7 +146,7 @@ else
 fi
 ```
 
-### Dataset loading
+#### Dataset loading
 
 For the entire assignment, I have used `SeuratObject`[@Seurat2021], a data structure
 designed to hold data for single cell RNAseq experiments. This is
@@ -156,9 +156,9 @@ as most function take it as an input. It is also an S4 object which
 makes it convenient to use most S4 class methods.
 
 ```{r, label=dataset-loading, results='hide', message=FALSE, warning=FALSE}
-# Read all the files into apprpriate seurat objects and put them into their respective case and control lists
+## Read all the files into apprpriate seurat objects and put them into their respective case and control lists
 
-# Function to read in the count matrices
+## Function to read in the count matrices
 read_counts <- function(file) {
   x <- readr::read_tsv(file)
   x <- as.data.frame(x)
@@ -168,7 +168,7 @@ read_counts <- function(file) {
   return(as.matrix(x))
 }
 
-# Function to read in metadata
+## Function to read in metadata
 read_meta <- function(file) {
   y <- readr::read_tsv(file)
   y <- as.data.frame(y)
@@ -178,9 +178,9 @@ read_meta <- function(file) {
   return(y)
 }
 
-#1. Healthy data preparation
+##1. Healthy data preparation
 
-## I am hard coding the paths but ideally you want to use getwd()
+### I am hard coding the paths but ideally you want to use getwd()
 counts_files <- list.files("/home/rstudio/projects/data/healthy", pattern = "*.dem.txt", full.names = TRUE)
 meta_files <- list.files("/home/rstudio/projects/data/healthy", pattern = "*.anno.txt", full.names = TRUE)
 healthy_samp_names <- str_extract(counts_files, "BM[^.]+")
@@ -188,12 +188,12 @@ healthy_samp_names <- str_extract(counts_files, "BM[^.]+")
 counts <- purrr::map(counts_files, read_counts)
 meta <- purrr::map(meta_files, read_meta)
 
-## Create seurat object
+### Create seurat object
 healthy_objs <- purrr::map2(counts, meta, ~ SeuratObject::CreateSeuratObject(counts = as(.x, "sparseMatrix"), meta.data = .y))
 names(healthy_objs) <- healthy_samp_names
 
 
-#2. AML data preparation
+##2. AML data preparation
 counts_files <- list.files("/home/rstudio/projects/data/cancer", pattern = "*.dem.txt", full.names = TRUE)
 meta_files <- list.files("/home/rstudio/projects/data/cancer", pattern = "*.anno.txt", full.names = TRUE)
 cancer_samp_names <- str_extract(counts_files, "AML[^.]+")
@@ -201,7 +201,7 @@ cancer_samp_names <- str_extract(counts_files, "AML[^.]+")
 counts <- purrr::map(counts_files, read_counts)
 meta <- purrr::map(meta_files, read_meta)
 
-# Create seurat object
+## Create seurat object
 cancer_objs <- purrr::map2(counts, meta, ~ SeuratObject::CreateSeuratObject(counts = as(.x, "sparseMatrix"), meta.data = .y))
 names(cancer_objs) <- cancer_samp_names
 
@@ -209,20 +209,20 @@ rm(counts)
 rm(meta)
 gc()
 
-# There are two lists of containing seurat objects: healthy and cancer 
-# healthy_objs and cancer_objs
+## There are two lists of containing seurat objects: healthy and cancer 
+## healthy_objs and cancer_objs
 ```
 
 
 ```{r, results='hide', message=FALSE, warning=FALSE}
-# combine the objects appropriately and show cell types
+## combine the objects appropriately and show cell types
 
 healthy_merg_seurat <- purrr::reduce(healthy_objs, merge)
 hdata <- healthy_merg_seurat
 hdata$condition <- "healthy"
 
-# names(hdata@assays$RNA@layers) <- names(healthy_objs)
-# Dont change the layer names, causes internal conflicts because of the oop (no setter available)
+## names(hdata@assays$RNA@layers) <- names(healthy_objs)
+## Dont change the layer names, causes internal conflicts because of the oop (no setter available)
 
 cancer_merg_seurat<- purrr::reduce(cancer_objs, merge)
 cdata <- cancer_merg_seurat
@@ -235,7 +235,7 @@ rm(healthy_objs)
 gc()
 ```
 
-## Exploratory Analysis {#samples-question}
+### Exploratory Analysis {#samples-question}
 
 NOTE: Functions from packages, which are part of the tidyverse ecosystem, are used throughout the analysis [@tidyverse2019].
 
@@ -265,7 +265,7 @@ p2 <- ggplot(cdata[[]], aes(x = fct_infreq(CellType), fill = CellType)) +
 grid.arrange(p1, p2, ncol = 2)
 ```
 
-## Experiment Hypotheis
+### Experiment Hypotheis
 
 Following exploratory analysis of the dataset, I found that that the
 most abundant cell type in the AML pateint sample was Pro-Monocytes.
@@ -277,13 +277,13 @@ This is also interesting because we are studying AML, which is a
 malignancy of myeloid cells, and pro-monocytes are a part of the myeloid
 lineage
 
-# Analysis
+## Analysis
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE}
-#1. merge healthy data with cancer
+##1. merge healthy data with cancer
 case_cont_data <- merge(hdata, cdata)
 
-#2. Add a metadata column that specifies info about celltype + condition
+##2. Add a metadata column that specifies info about celltype + condition
 case_cont_data[[]]["CellType-condition"] <- paste0(case_cont_data$CellType, "-", case_cont_data$condition)
 Idents(case_cont_data) <- 'CellType-condition'
 ```
@@ -292,25 +292,25 @@ Idents(case_cont_data) <- 'CellType-condition'
 cat("Total genes in our dataset:", nrow(case_cont_data))
 ```
 
-## Gene identifier mapping
+### Gene identifier mapping
 
 NOTE: Coding help from Gen.AI was seeked to figure out to how fetch data
 from different mirrors while being able to catch any errors in
 connecting to the mart itslef and during the retrival of information.
 
 ```{r}
-# Check mapping of all genes to HUGO symbols
-# Get all gene names from the dataset
+## Check mapping of all genes to HUGO symbols
+## Get all gene names from the dataset
 all_genes <- Features(case_cont_data)
 cat("Total genes in dataset:", length(all_genes), "\n\n")
 
-# Connect to biomaRt with error handling
+## Connect to biomaRt with error handling
 library(biomaRt)
 
-# Increase timeout
+## Increase timeout
 options(timeout = 300)
 
-# Try to connect to biomaRt with fallback mirrors
+## Try to connect to biomaRt with fallback mirrors
 mart <- NULL
 mirrors <- c(
   "https://asia.ensembl.org",
@@ -335,7 +335,7 @@ if (is.null(mart)) {
   stop("Failed to connect to any Ensembl mirror. Please check your internet connection and try again later.")
 }
 
-# Query all genes with error handling and retry logic
+## Query all genes with error handling and retry logic
 chunk_size <- 5000
 n_chunks <- ceiling(length(all_genes) / chunk_size)
 all_results <- list()
@@ -390,7 +390,7 @@ for (i in 1:n_chunks) {
   }
 }
 
-# Report on failed chunks
+## Report on failed chunks
 if (length(failed_chunks) > 0) {
   cat("\n⚠ WARNING: The following chunks failed to download:\n")
   cat("Chunks:", paste(failed_chunks, collapse = ", "), "\n")
@@ -400,7 +400,7 @@ if (length(failed_chunks) > 0) {
             collapse = "; "), "\n\n")
 }
 
-# Combine all results, filtering out empty data frames
+## Combine all results, filtering out empty data frames
 all_results <- all_results[sapply(all_results, nrow) > 0]
 
 if (length(all_results) == 0) {
@@ -416,7 +416,7 @@ mapped_genes <- tryCatch({
              gene_biotype = character())
 })
 
-# Analysis of mapping results
+## Analysis of mapping results
 cat("\n=== MAPPING RESULTS ===\n")
 cat("Total genes queried:", length(all_genes), "\n")
 cat("Successfully mapped:", nrow(mapped_genes), "\n")
@@ -427,11 +427,11 @@ if (length(all_genes) > 0) {
   cat("Match rate: N/A (no genes to query)\n\n")
 }
 
-# Identify unmapped genes
+## Identify unmapped genes
 unmapped_genes <- setdiff(all_genes, mapped_genes$hgnc_symbol)
 cat("Unmapped genes:", length(unmapped_genes), "\n")
 
-# Show examples of unmapped genes
+## Show examples of unmapped genes
 if (length(unmapped_genes) > 0) {
   cat("\nFirst 20 unmapped genes:\n")
   print(head(unmapped_genes, 20))
@@ -447,7 +447,7 @@ if (length(unmapped_genes) > 0) {
   })
 }
 
-# Check for gene biotypes
+## Check for gene biotypes
 if (nrow(mapped_genes) > 0) {
   cat("\n=== GENE BIOTYPES ===\n")
   biotype_summary <- table(mapped_genes$gene_biotype)
@@ -491,7 +491,7 @@ if (nrow(mapped_genes) > 0) {
   cat("\n⚠ No genes were successfully mapped. Cannot generate biotype summary.\n")
 }
 
-# Check for duplicate mappings (genes that map to multiple symbols)
+## Check for duplicate mappings (genes that map to multiple symbols)
 duplicated_genes <- all_genes[duplicated(all_genes)]
 if (length(duplicated_genes) > 0) {
   cat("\n=== DUPLICATE GENES ===\n")
@@ -499,7 +499,7 @@ if (length(duplicated_genes) > 0) {
   print(head(duplicated_genes, 20))
 }
 
-# Summary
+## Summary
 cat("\n=== SUMMARY ===\n")
 if (length(all_genes) > 0 && nrow(mapped_genes) > 0) {
   match_rate <- nrow(mapped_genes) / length(all_genes)
@@ -519,7 +519,7 @@ if (length(all_genes) > 0 && nrow(mapped_genes) > 0) {
 
 
 ```{r}
-# Create bar plot for UNMAPPED gene biotypes
+## Create bar plot for UNMAPPED gene biotypes
 if (length(unmapped_genes) > 0) {
   cat("\n=== ANALYZING UNMAPPED GENES ===\n")
   
@@ -586,12 +586,12 @@ if (length(unmapped_genes) > 0) {
 Above is a barplot of biotypes of unmapped genes for which biotype
 information was available.
 
-### Handling of duplicate gene mappings {#gene-mapping-question1}
+#### Handling of duplicate gene mappings {#gene-mapping-question1}
 
 No duplicate gene symbols were detected in this dataset, we explicitely
 check for it in the code.
 
-### Handling of unmapped genes {#gene-mapping-question2}
+#### Handling of unmapped genes {#gene-mapping-question2}
 
 -   **Total unmapped**: 3494
 -   **Approach**: These genes were analyzed for their biotype
@@ -600,9 +600,9 @@ check for it in the code.
     completeness but are clearly identified and can be filtered if
     needed for specific analyses
 
-## Normalization
+### Normalization
 
-### Rationale for normalization method
+#### Rationale for normalization method
 
 For single-cell RNA-seq data, I chose to use **log-normalization*, which is routinely used in scRNAseq, from
 Seurat's `NormalizeData()` function [@Seurat2021] . This method performs the following
@@ -621,26 +621,26 @@ To assess the effectiveness of normalization, I compared the
 distribution of total counts per cell before and after normalization.
 
 ```{r normalization-comparison, fig.width=10, fig.height=4, fig.cap="Figure 2: Distribution of sum of counts per cell before and after LogNormalize normalization. The left panel shows raw counts with high variability across cells, while the right panel shows normalized data with reduced technical variation."}
-# Join layers first
+## Join layers first
 case_cont_data <- JoinLayers(case_cont_data)
 
-# Extract sum of counts for each cell
+## Extract sum of counts for each cell
 counts_before <- colSums(LayerData(case_cont_data, assay = "RNA", layer = "counts"))
 counts_after <- colSums(LayerData(case_cont_data, assay = "RNA", layer = "data"))
 
-# Create comparison dataframe
+## Create comparison dataframe
 comparison_df <- data.frame(
   Before_Normalization = counts_before,
   After_Normalization = counts_after
 )
 
-# Reshape to long format
+## Reshape to long format
 comparison_long <- pivot_longer(comparison_df, 
                                  cols = c("Before_Normalization", "After_Normalization"),
                                  names_to = "Stage", 
                                  values_to = "Sum_Counts")
 
-# Create histogram
+## Create histogram
 ggplot(comparison_long, aes(x = Sum_Counts, fill = Stage)) +
   geom_histogram(bins = 100) +
   facet_wrap(~Stage, scales = "free") +
@@ -670,9 +670,9 @@ retained the data in a Seurat object format, which efficiently stores: -
 Gene expression matrix (genes × cells) - Cell metadata (condition, cell
 type, etc.) - Normalized data in separate layers
 
-## Differential Gene Expression
+### Differential Gene Expression
 
-### Model design
+#### Model design
 
 For differential expression analysis, I used Seurat's `FindMarkers()`
 function [@Seurat2021], which implements: 
@@ -686,9 +686,9 @@ First I run the basic pipeline to fully process the single-cell data, this inclu
 Finally then, I ask what genes are differentially upregulates/downregulated in different conditions for cells of the same type.
 
 ```{r pipelne+dimplots, fig.show='hold', fig.width=14, fig.height=6, fig.cap=c("UMAP colored by sample origin, UMAP colored by clusters (resolution = 2.0), UMAP colored by annotated cell type.")}
-# Identify differential expressed genes across conditions
+## Identify differential expressed genes across conditions
 
-#3. Run Pipeline
+##3. Run Pipeline
 case_cont_data <- FindVariableFeatures(case_cont_data)
 case_cont_data <- ScaleData(case_cont_data)
 case_cont_data <- RunPCA(case_cont_data)
@@ -699,12 +699,12 @@ case_cont_data <- FindClusters(case_cont_data, resolution = 2, cluster.name = "u
 case_cont_data <- RunUMAP(case_cont_data, dims = 1:30, reduction = "pca", reduction.name = "umap.unintegrated")
 DimPlot(case_cont_data, reduction = "umap.unintegrated", group.by = c("orig.ident", "unintegrated_clusters", "CellType"))
 
-#3. DGE
+##3. DGE
 case_cont_data[["RNA"]] <- JoinLayers(case_cont_data[["RNA"]])
 Idents(case_cont_data) <- 'CellType-condition'
-promono.case_cond.response <- FindMarkers(case_cont_data, ident.1 = "ProMono-healthy", ident.2 = "ProMono-like-cancer", verbose = FALSE)
+promono.case_cond.response <- FindMarkers(case_cont_data, ident.1 = "ProMono-like-cancer", ident.2 = "ProMono-healthy", verbose = FALSE)
 
-# Get top 5 upregulated genes (positive log2FC = higher in healthy)
+## Get top 5 upregulated genes (positive log2FC = higher in healthy)
 top_up <- promono.case_cond.response %>%
   filter(avg_log2FC > 0) %>%
   arrange(p_val_adj) %>%
@@ -714,7 +714,7 @@ top_up$Gene <- rownames(top_up)
 top_up$Direction <- "Upregulated"
 top_up <- top_up[, c("Gene", "avg_log2FC", "p_val_adj", "Direction")]
 
-# Get top 5 downregulated genes (negative log2FC = higher in cancer)
+## Get top 5 downregulated genes (negative log2FC = higher in cancer)
 top_down <- promono.case_cond.response %>%
   filter(avg_log2FC < 0) %>%
   arrange(p_val_adj) %>%
@@ -724,12 +724,12 @@ top_down$Gene <- rownames(top_down)
 top_down$Direction <- "Downregulated"
 top_down <- top_down[, c("Gene", "avg_log2FC", "p_val_adj", "Direction")]
 
-# Combine and format
+## Combine and format
 top_genes_table <- rbind(top_up, top_down)
 top_genes_table$avg_log2FC <- round(top_genes_table$avg_log2FC, 3)
 top_genes_table$p_val_adj <- format(top_genes_table$p_val_adj, scientific = TRUE, digits = 3)
 
-# Rename columns for display
+## Rename columns for display
 colnames(top_genes_table) <- c("Gene", "Log2 Fold Change", "Adjusted P-value", "Direction")
 
 library(knitr)
@@ -739,24 +739,24 @@ kable(top_genes_table,
       caption = "Top 5 upregulated and downregulated genes in healthy vs cancer pro-monocytes.")
 ```
 
-### Volcano plot visualization
+#### Volcano plot visualization
 
 ```{r volcano-plot, warning=FALSE, message=FALSE,fig.width=10, fig.height=8, fig.cap="Volcano plot showing differential gene expression between healthy and cancer pro-monocytes. Each point represents a gene. The x-axis shows log2 fold change (positive values indicate higher expression in healthy cells, negative values indicate higher expression in cancer cells). The y-axis shows statistical significance as -log10(adjusted p-value). Red points indicate significantly upregulated genes in healthy cells (log2FC > 0.6, adj. p-value < 0.05), blue points indicate significantly upregulated genes in cancer cells (log2FC < -0.6, adj. p-value < 0.05), and gray points are not significantly different. Vertical dashed lines mark the fold change threshold (±0.6), and the horizontal dashed line marks the significance threshold (adj. p-value = 0.05). Gene labels are shown for the most significant differentially expressed genes [@ggplot2016][@ggrepel2023]."}
-# Visualisation
+## Visualisation
 library(ggplot2)
 library(ggrepel)
 
-# Add a column for significance
+## Add a column for significance
 promono.case_cond.response$gene <- rownames(promono.case_cond.response)
 promono.case_cond.response$diffexpressed <- "NO"
 promono.case_cond.response$diffexpressed[promono.case_cond.response$avg_log2FC > 0.6 & promono.case_cond.response$p_val_adj < 0.05] <- "UP"
 promono.case_cond.response$diffexpressed[promono.case_cond.response$avg_log2FC < -0.6 & promono.case_cond.response$p_val_adj < 0.05] <- "DOWN"
 
-# Label top genes
+## Label top genes
 promono.case_cond.response$delabel <- NA
 promono.case_cond.response$delabel[promono.case_cond.response$diffexpressed != "NO"] <- promono.case_cond.response$gene[promono.case_cond.response$diffexpressed != "NO"]
 
-# Plot
+## Plot
 ggplot(promono.case_cond.response, aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
   geom_vline(xintercept = c(-0.6, 0.6), col = "gray", linetype = 'dashed') +
   geom_hline(yintercept = -log10(0.05), col = "gray", linetype = 'dashed') +
@@ -772,7 +772,7 @@ ggplot(promono.case_cond.response, aes(x = avg_log2FC, y = -log10(p_val_adj), co
 
 **Interpretation**: The volcano plot reveals clear transcriptional differences between healthy and cancer pro-monocytes. Genes on the right (positive log2FC) are upregulated in healthy cells relative to cancer, while genes on the left are downregulated. The vertical spread (-log10 p-value) indicates statistical confidence, with genes at the top showing the strongest evidence for differential expression.
 
-### Statistical thresholds and results
+#### Statistical thresholds and results
 
 **Thresholds used**: 
 - **P-value threshold**: p_val_adj \< 0.05 (adjusted p-value using Bonferroni correction) 
@@ -783,7 +783,7 @@ ggplot(promono.case_cond.response, aes(x = avg_log2FC, y = -log10(p_val_adj), co
 - **Log2FC \> 0.6**: Biological significance threshold captures genes with meaningful expression changes while filtering out minor fluctuations
 
 ```{r dge-summary}
-# Calculate number of significant genes
+## Calculate number of significant genes
 sig_genes <- promono.case_cond.response[promono.case_cond.response$p_val_adj < 0.05, ]
 up_genes <- sig_genes[sig_genes$avg_log2FC > 0.6, ]
 down_genes <- sig_genes[sig_genes$avg_log2FC < -0.6, ]
@@ -795,7 +795,7 @@ cat("Upregulated genes (log2FC > 0.6):", nrow(up_genes), "\n")
 cat("Downregulated genes (log2FC < -0.6):", nrow(down_genes), "\n")
 ```
 
-### Multiple hypothesis testing correction
+#### Multiple hypothesis testing correction
 
 **Method used**: Bonferroni correction (default in Seurat's FindMarkers)
 
@@ -803,36 +803,36 @@ cat("Downregulated genes (log2FC < -0.6):", nrow(down_genes), "\n")
 Standard in scRNA-seq and Widely accepted in the field. Alternatively we could have also used Benjamini-Hochberg.
 
 
-### Heatmap of top differentially expressed genes
+#### Heatmap of top differentially expressed genes
 
 ```{r de-heatmap, fig.width=10, fig.height=12, fig.cap="Heatmap of the top 50 differentially expressed genes between healthy and cancer pro-monocytes. Rows represent genes and columns represent individual cells. Gene expression values are scaled. Cells are annotated by condition (healthy vs cancer) and hierarchically clustered based on expression patterns. Color intensity indicates relative expression level: red (high), white (medium), blue (low) [@pheatmap2019].", warning=FALSE, message=FALSE}
 library(pheatmap)
 library(pheatmap)
 
-# Get top 50 DE genes (25 up, 25 down)
+## Get top 50 DE genes (25 up, 25 down)
 top_genes <- promono.case_cond.response %>%
   filter(diffexpressed != "NO") %>%
   arrange(p_val_adj) %>%
   head(50) %>%
   rownames()
 
-# Subset Seurat object to pro-monocytes only
+## Subset Seurat object to pro-monocytes only
 promono_cells <- case_cont_data[, case_cont_data$`CellType-condition` %in% 
                                    c("ProMono-healthy", "ProMono-like-cancer")]
 
-# Scale the data for these specific genes if not already done
+## Scale the data for these specific genes if not already done
 promono_cells <- ScaleData(promono_cells, features = top_genes)
 
-# Extract scaled data for heatmap
+## Extract scaled data for heatmap
 heatmap_data <- LayerData(promono_cells, assay = "RNA", layer = "scale.data")[top_genes, ]
 
-# Create annotation for columns (cells)
+## Create annotation for columns (cells)
 cell_annotation <- data.frame(
   Condition = promono_cells$condition,
   row.names = colnames(heatmap_data)
 )
 
-# Plot heatmap
+## Plot heatmap
 pheatmap(heatmap_data,
          annotation_col = cell_annotation,
          show_colnames = FALSE,
@@ -857,7 +857,7 @@ Yes, the heatmap demonstrates clear clustering of cells by condition
 
 The clear separation validates our differential expression analysis.
 
-### Final dataset coverage {#coverage-question}
+#### Final dataset coverage {#coverage-question}
 
 ```{r, label=final-coverage, echo=FALSE}
 cat("=== FINAL DATASET COVERAGE ===\n")
@@ -869,7 +869,7 @@ cat("Pro-monocyte cells (healthy):", sum(case_cont_data$`CellType-condition` == 
 cat("Pro-monocyte cells (cancer):", sum(case_cont_data$`CellType-condition` == "ProMono-like-cancer"), "\n")
 ```
 
-# Discussion and Conclusion
+## Discussion and Conclusion
 
 To summarise, I indeed find patterns of biological organisation,
 indicated by clear seperation of two conditions, in the heatmap
@@ -909,4 +909,13 @@ NOTE: I have extensively used comments at places in the form of notes
 within the code, this limits the number of entries I have made in the
 course journal.
 
-# References
+#### For Assignment 2
+```{r, eval=FALSE}
+## save the result of dge analysis
+setwd("projects")
+promono.case_cond.response["gene"] <- row.names(promono.case_cond.response)
+write_csv(promono.case_cond.response, "degList.csv")
+```
+
+
+## References
